@@ -1,0 +1,15 @@
+bas
+sba
+----
+bas
+====
+abca
+bcab
+---
+abc
+====
+abcdabcdab
+cdabcda
+------
+abcd
+=======

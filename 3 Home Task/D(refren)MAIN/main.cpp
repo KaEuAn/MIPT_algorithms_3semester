@@ -66,10 +66,10 @@ public:
     }
     virtual void construct() = 0;
     virtual ~SolveTask() = default;
-    virtual void run(const vector<u8> &array) {
+    virtual AnswerType run(const vector<u8> &array) {
         getData(array);
         construct();
-        getAnswer().print();
+        return getAnswer();
     }
     virtual AnswerType getAnswer() = 0;
 
@@ -341,9 +341,9 @@ public:
 };
 
 template<typename AlgoType = SuffixTree>
-void findRefren(const vector<u8> &array) {
+AnswerType findRefren(const vector<u8> &array) {
     AlgoType au;
-    au.run(array);
+    return au.run(array);
 }
 
 
@@ -355,6 +355,10 @@ int main() {
     for (u32 i = 0; i < n; ++i) {
         cin >> array[i];
     }
-    findRefren(array);
+    auto x = findRefren<SuffixTree>(array);
+    auto y = findRefren<SuffixAutomat>(array);
+    if (x.getAnswer() == y.getAnswer()) {
+        x.print();
+    }
     return 0;
 }

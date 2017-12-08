@@ -1,0 +1,19 @@
+? love
+? is
+A Loveis
+? love
+? WHO
+A Whoareyou
+? is
+______________
+NO
+NO
+YES
+NO
+YES
+______________
+______________
+A 7842397
+? 2397
+? 425
+A

@@ -17,7 +17,6 @@ using std::make_shared;
 using std::make_pair;
 
 class AnswerType {
-public:
     u32 answer;
     u32 length;
     vector<u8> string;
@@ -29,7 +28,29 @@ public:
             cout << it << ' ';
         }
     }
-    friend class SuffixAutomat;
+    u32 getAnswer() const {
+        return answer;
+    }
+    u32 getLength() const {
+        return length;
+    }
+    void update(u32 count, u32 leng) {
+        if(count * leng > answer) {
+            answer = count * leng;
+            length = leng;
+        }
+    }
+
+    void reserve(u32 i) {
+        string.reserve(i);
+    }
+
+    void reverseString() {
+        std::reverse(string.begin(), string.end());
+    }
+    void pushString(u8 nextElement) {
+        string.push_back(nextElement);
+    }
 };
 
 class SolveTask {
@@ -76,17 +97,17 @@ class SuffixAutomat : public SolveTask {
     shared_ptr<Vertice> lastString;
     vector<vector<Vertice*>> sortedByLength;
 
-    void addChar(u8 newSimbol) {
+    void addChar(u8 newSymbol) {
         auto newLast = make_shared<Vertice>(lastString->len + 1);
         sortedByLength[newLast->len].push_back(newLast.get());
         Vertice* it = lastString.get();
-        for(; it && it->children.count(newSimbol) == 0; it = it->suff) {
-            it->children[newSimbol] = newLast;
+        for(; it && it->children.count(newSymbol) == 0; it = it->suff) {
+            it->children[newSymbol] = newLast;
         }
         if (!it)
             newLast->suff = start.get();
         else {
-            Vertice* itChild = (it->children[newSimbol]).get();
+            Vertice* itChild = (it->children[newSymbol]).get();
             if (it->len + 1 == itChild->len)
                 newLast->suff = itChild;
             else {
@@ -94,8 +115,8 @@ class SuffixAutomat : public SolveTask {
                 sortedByLength[clone->len].push_back(clone.get());
                 itChild->suff = clone.get();
                 newLast->suff = clone.get();
-                for(; it && it->children[newSimbol].get() == itChild; it = it->suff) {
-                    it->children[newSimbol] = clone;
+                for(; it && it->children[newSymbol].get() == itChild; it = it->suff) {
+                    it->children[newSymbol] = clone;
                 }
             }
         }
@@ -109,7 +130,7 @@ public:
         sortedByLength.assign(sequence.size() + 1, vector<Vertice*>());
         start = lastString = make_shared<Vertice>();
         start->count = 0;
-        for (int i = 0; i < sequence.size(); ++i) {
+        for (u32 i = 0; i < sequence.size(); ++i) {
             addChar(sequence[i]);
         }
         for (int j = sequence.size(); j >= 0; --j) {
@@ -122,10 +143,7 @@ public:
 
     void findLenAns(const shared_ptr<Vertice>& v) {
         v->used = true;
-        if ((v->len * v->count) > answer.answer) {
-            answer.answer = v->len * v->count;
-            answer.length = v->len;
-        }
+        answer.update(v->count, v->len);
         for(const auto& it: v->children) {
             if (! it.second->used)
                 findLenAns(it.second);
@@ -134,26 +152,27 @@ public:
 
     void findString(const shared_ptr<Vertice>& v, u32 le) {
         v->used = false;
-        if ((v->len * v->count) == answer.answer) {
+        if ((v->len * v->count) == answer.getAnswer()) {
             answerWasFound = true;
             return;
         }
         for(const auto& it: v->children) {
             if (it.second->used && it.second->len == le + 1) {
-                answer.string.push_back(it.first);
                 findString(it.second, le + 1);
-                if(answerWasFound)
+                if(answerWasFound) {
+                    answer.pushString(it.first);
                     return;
-                answer.string.pop_back();
+                }
             }
         }
     }
 
 
     virtual AnswerType getAnswer() override {
-        answer.string.reserve(sequence.size());
+        answer.reserve(sequence.size());
         findLenAns(start);
         findString(start, 0);
+        answer.reverseString();
         return answer;
     }
 
@@ -169,13 +188,14 @@ class SuffixTree : public SolveTask {
         Vertice* parent;
         u32 count;
         map<u8, Vertice*> children;
+        bool isLeaf;
         Vertice(u32 ss, u32 ff, Vertice* p, Vertice* s = nullptr, u32 c = 0) :
-                suff(s), edgeStart(ss), edgeFinish(ff), parent(p), count(c) {}
+                suff(s), edgeStart(ss), edgeFinish(ff), parent(p), count(c), isLeaf(false) {}
         Vertice() : Vertice(0, 0, nullptr) {}
-        Vertice*& getChild(u8 simbol) {
-            if (!children.count(simbol))
-                children[simbol] = nullptr;
-            return children[simbol];
+        Vertice*& getChild(u8 symbol) {
+            if (!children.count(symbol))
+                children[symbol] = nullptr;
+            return children[symbol];
         }
         ~Vertice() {
             for(const auto& it : children) {
@@ -184,7 +204,7 @@ class SuffixTree : public SolveTask {
         }
 
         u32 length() const {
-            return edgeFinish - edgeStart;
+            return edgeFinish - edgeStart - isLeaf;
         }
     };
     struct Position {
@@ -198,14 +218,12 @@ class SuffixTree : public SolveTask {
     Position lastNotLeaf;
 
     Vertice* getSuff(Vertice* v) {
-        if (v == start)
-            return v;
+        if (v->parent == nullptr)
+            return start;
         if (! v->suff) {
             auto parentSuff = getSuff(v->parent);
             Position pos(parentSuff, parentSuff->length());
-            u32 x = v->edgeStart;
-            if (v->parent == start)
-                ++x;
+            u32 x = v->edgeStart + (v->parent == start);
             v->suff = split(tryGoDownInTree(pos, x, v->edgeFinish));
         }
         return v->suff;
@@ -236,32 +254,31 @@ class SuffixTree : public SolveTask {
     }
 
     Vertice* split(Position pos) {
-        //if already have vertice
+        //if already have Vertice
         if (pos.distance == pos.vertice->length())
             return pos.vertice;
         if (pos.distance == 0)
             return pos.vertice->parent;
         auto newVerticeInTheMiddle = new Vertice(pos.vertice->edgeStart,pos.vertice->edgeStart + pos.distance,
                                                pos.vertice->parent);
+        pos.vertice->parent->getChild(sequence[pos.vertice->edgeStart]) = newVerticeInTheMiddle;
         pos.vertice->parent = newVerticeInTheMiddle;
         newVerticeInTheMiddle->getChild(sequence[pos.vertice->edgeStart + pos.distance]) = pos.vertice;
-        pos.vertice->parent->getChild(sequence[pos.vertice->edgeStart]) = newVerticeInTheMiddle;
         pos.vertice->edgeStart += pos.distance;
         return newVerticeInTheMiddle;
-
     }
 
-    void addChar(u8 newSimbol, u32 indexSimbol) {
+    void addChar(u32 indexSymbol) {
         for(Vertice* parentNewLeaf = nullptr; parentNewLeaf != start;) {
-            Position newPos = tryGoDownInTree(lastNotLeaf, indexSimbol, indexSimbol + 1);
+            Position newPos = tryGoDownInTree(lastNotLeaf, indexSymbol, indexSymbol + 1);
             if (newPos.vertice) {
                 lastNotLeaf = newPos;
                 break;
             }
             parentNewLeaf = split(lastNotLeaf);
-            auto newLeaf = new Vertice(indexSimbol, sequence.size(), parentNewLeaf);
+            auto newLeaf = new Vertice(indexSymbol, sequence.size(), parentNewLeaf);
             lastNotLeaf.vertice = getSuff(parentNewLeaf);
-            parentNewLeaf->getChild(newSimbol) = newLeaf;
+            parentNewLeaf->getChild(sequence[indexSymbol]) = newLeaf;
             lastNotLeaf.distance = lastNotLeaf.vertice->length();
         }
     }
@@ -270,53 +287,55 @@ class SuffixTree : public SolveTask {
 public:
     virtual void construct() override {
         start = new Vertice();
+        sequence.push_back(0);
         lastNotLeaf = Position(start, 0);
         for (u32 i = 0; i < sequence.size(); ++i) {
-            addChar(sequence[i], i);
+            addChar(i);
         }
     }
     ~SuffixTree() {
         delete start;
     }
 
-    void findLenAns(Vertice* v) {
+    void findLenAns(Vertice* v, u32 le) {
+        u32 commonLength = le + v->length();
         for(const auto& it: v->children) {
-            findLenAns(it.second);
+            findLenAns(it.second, commonLength);
             v->count += it.second->count;
         }
-        if (v->count == 0)
+        if (v->count == 0) {
             v->count = 1;
-        if(v->count * v->length() > answer.answer) {
-            answer.answer = v->count * v->length();
-            answer.length = v->length();
+            v->isLeaf = true;
         }
+        commonLength = le + v->length();
+        answer.update(v->count, commonLength);
+
     }
 
     void findString(Vertice* v, u32 le) {
         u32 commonLength = le + v->length();
-        if ((commonLength * v->count) == answer.answer) {
+        if (commonLength * v->count == answer.getAnswer() && commonLength == answer.getLength()) {
             answerWasFound = true;
             return;
         }
         for(const auto& it: v->children) {
-            if (le + it.second->length() > answer.length)
+            if (le + it.second->length() > answer.getLength())
                 continue;
-            for (u32 i = it.second->edgeStart; i < it.second->edgeFinish; ++i) {
-                answer.string.push_back(it.first);
-            }
             findString(it.second, commonLength);
-            if(answerWasFound)
+            if(answerWasFound) {
+                for (u32 i = it.second->edgeStart + it.second->length() - 1; i >= it.second->edgeStart && i < 999999999; --i) {
+                    answer.pushString(sequence[i]);
+                }
                 return;
-            for (u32 i = it.second->edgeStart; i < it.second->edgeFinish; ++i) {
-                answer.string.pop_back();
             }
         }
     }
 
     virtual AnswerType getAnswer() override {
-        answer.string.reserve(sequence.size());
-        findLenAns(start);
+        answer.reserve(sequence.size());
+        findLenAns(start, 0);
         findString(start, 0);
+        answer.reverseString();
         return answer;
     }
 };
@@ -333,7 +352,7 @@ int main() {
     u32 m;
     cin >> n >> m;
     vector<u8> array(n, 0);
-    for (int i = 0; i < n; ++i) {
+    for (u32 i = 0; i < n; ++i) {
         cin >> array[i];
     }
     findRefren(array);

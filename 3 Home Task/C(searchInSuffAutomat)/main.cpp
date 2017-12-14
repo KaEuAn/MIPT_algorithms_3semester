@@ -34,24 +34,24 @@ struct SuffixAutomat {
     shared_ptr<Vertice> start;
     shared_ptr<Vertice> lastString;
 
-    void addChar(char newSimbol) {
+    void addChar(u8 newSymbol) {
         auto newLast = make_shared<Vertice>(lastString->len + 1);
         Vertice* it = lastString.get();
-        for(; it && it->children.count(newSimbol) == 0; it = it->suff) {
-            it->children[newSimbol] = newLast;
+        for(; it && it->children.count(newSymbol) == 0; it = it->suff) {
+            it->children[newSymbol] = newLast;
         }
         if (!it)
             newLast->suff = start.get();
         else {
-            Vertice* itChild = (it->children[newSimbol]).get();
+            Vertice* itChild = (it->children[newSymbol]).get();
             if (it->len + 1 == itChild->len)
                 newLast->suff = itChild;
             else {
                 auto clone = make_shared<Vertice>(itChild, it->len + 1);
                 itChild->suff = clone.get();
                 newLast->suff = clone.get();
-                for(; it && it->children[newSimbol].get() == itChild; it = it->suff) {
-                    it->children[newSimbol] = clone;
+                for(; it && it->children[newSymbol].get() == itChild; it = it->suff) {
+                    it->children[newSymbol] = clone;
                 }
             }
         }
